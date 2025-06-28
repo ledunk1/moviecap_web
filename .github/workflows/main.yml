@@ -18,7 +18,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12.0' # Pastikan versi ini sesuai dengan yang Anda gunakan secara lokal jika memungkinkan
+        python-version: '3.9' # Pastikan versi ini sesuai dengan yang Anda gunakan secara lokal jika memungkinkan
         
     - name: Install dependencies
       shell: bash # Menggunakan bash untuk opsi set -e yang lebih baik
