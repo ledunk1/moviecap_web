@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Editor</title>
+    <link rel="icon" type="image/x-icon" href="/static/movie.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold text-gray-800 mb-8">Auto Movie Recap Editor</h1>
+            
+            <!-- File Manager -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">File Manager</h2>
+                <div class="overflow-x-auto">
+                    <div v-if="files && files.length > 0">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modified</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr v-for="file in files" :key="file.name">
+                                    <td class="px-6 py-4 whitespace-nowrap" v-text="file.name"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap" v-text="formatFileSize(file.size)"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap" v-text="file.modified"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <button @click="downloadFile(file.name)" 
+                                                class="text-blue-600 hover:text-blue-900 mr-4">Download</button>
+                                        <button @click="deleteFile(file.name)"
+                                                class="text-red-600 hover:text-red-900">Delete</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="text-center py-4 text-gray-500">
+                        No files available
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                <form @submit.prevent="submitForm" class="space-y-6">
+                    <!-- File inputs -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Video File</label>
+                            <input type="file" @change="handleVideoFile" accept="video/*" 
+                                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Audio File</label>
+                            <input type="file" @change="handleAudioFile" accept="audio/*"
+                                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                        </div>
+                    </div>
+
+                    <!-- Settings -->
+                    <div class="space-y-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Effect Settings</h2>
+                        
+                        <!-- Effect Probabilities -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Effect Probabilities (Total must equal 1.0)</h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600">Slow Motion (0-1)</label>
+                                    <input type="number" v-model="settings.effect_probs.slowmo" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600">Freeze (0-1)</label>
+                                    <input type="number" v-model="settings.effect_probs.freeze" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600">Normal (0-1)</label>
+                                    <input type="number" v-model="settings.effect_probs.normal" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-1">Current total: {{ effectProbTotal }}</p>
+                        </div>
+
+                        <!-- Segment Distribution -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Segment Distribution (Total must equal 1.0)</h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600">Beginning (0-1)</label>
+                                    <input type="number" v-model="settings.segment_dist.beginning" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600">Middle (0-1)</label>
+                                    <input type="number" v-model="settings.segment_dist.middle" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600">End (0-1)</label>
+                                    <input type="number" v-model="settings.segment_dist.end" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-1">Current total: {{ segmentDistTotal }}</p>
+                        </div>
+
+                        <!-- Transition Settings -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Transition Settings</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600">Fade Probability</label>
+                                    <input type="number" v-model="settings.transition.fade_probability" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600">Fade Duration</label>
+                                    <input type="number" v-model="settings.transition.fade_duration" step="0.1" min="0"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Repeat Settings -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Repeat Settings</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600">Repeat Probability</label>
+                                    <input type="number" v-model="settings.repeat.probability" step="0.01" min="0" max="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600">Max Repeats</label>
+                                    <input type="number" v-model="settings.repeat.max_repeats" step="1" min="1"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Freeze Settings -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Freeze Frame Settings</h3>
+                            <div>
+                                <label class="block text-sm text-gray-600">Zoom Probability</label>
+                                <input type="number" v-model="settings.freeze.zoom_probability" step="0.01" min="0" max="1"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                            </div>
+                        </div>
+
+                        <!-- Other Settings -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm text-gray-600">Slow Motion Speed</label>
+                                <input type="number" v-model="settings.slowmo_speed" step="0.01" min="0" max="1"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">FPS</label>
+                                <input type="number" v-model="settings.fps" step="1" min="1"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+                            </div>
+                        </div>
+
+                        <!-- Excluded Timestamps -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Excluded Timestamps</h3>
+                            <div class="space-y-2">
+                                <div v-for="(timestamp, index) in settings.excluded_timestamps" :key="'excluded-'+index" class="flex gap-2">
+                                    <input type="number" v-model="timestamp[0]" placeholder="Start" class="w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    <input type="number" v-model="timestamp[1]" placeholder="End" class="w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    <input type="text" v-model="timestamp[2]" placeholder="Description" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    <button type="button" @click="removeExcludedTimestamp(index)" class="px-2 py-1 text-red-600 hover:text-red-800">
+                                        Remove
+                                    </button>
+                                </div>
+                                <button type="button" @click="addExcludedTimestamp" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                                    + Add Excluded Timestamp
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Included Timestamps -->
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-700 mb-2">Included Timestamps</h3>
+                            <div class="space-y-2">
+                                <div v-for="(timestamp, index) in settings.include_timestamps" :key="'included-'+index" class="flex gap-2">
+                                    <input type="number" v-model="timestamp[0]" placeholder="Start" class="w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    <input type="number" v-model="timestamp[1]" placeholder="End" class="w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    <select v-model="timestamp[2]" class="w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="beginning">Beginning</option>
+                                        <option value="middle">Middle</option>
+                                        <option value="end">End</option>
+                                    </select>
+                                    <button type="button" @click="removeIncludedTimestamp(index)" class="px-2 py-1 text-red-600 hover:text-red-800">
+                                        Remove
+                                    </button>
+                                </div>
+                                <button type="button" @click="addIncludedTimestamp" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                                    + Add Included Timestamp
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div>
+                        <button type="submit" 
+                                class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                :disabled="processing || !isValidProbabilities">
+                            <span v-if="processing">Processing...</span>
+                            <span v-else>Generate Video</span>
+                        </button>
+                        <p v-if="!isValidProbabilities" class="text-red-500 text-sm mt-2">
+                            Please ensure all probability totals equal 1.0
+                        </p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Processing Status -->
+            <div v-if="status" :class="['p-4 rounded-md mb-4', statusClass]">
+                <span v-text="status"></span>
+            </div>
+
+            <!-- Download Button -->
+            <div v-if="outputFile" class="text-center">
+                <a :href="'/download/' + outputFile" 
+                   class="inline-block bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                    Download Processed Video
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    files: [],
+                    videoFile: null,
+                    audioFile: null,
+                    settings: {
+                        effect_probs: {
+                            slowmo: 0.25,
+                            freeze: 0.65,
+                            normal: 0.10
+                        },
+                        segment_dist: {
+                            beginning: 0.40,
+                            middle: 0.25,
+                            end: 0.35
+                        },
+                        slowmo_speed: 0.35,
+                        fps: 24,
+                        transition: {
+                            fade_probability: 0.5,
+                            fade_duration: 0.5
+                        },
+                        repeat: {
+                            probability: 0.2,
+                            max_repeats: 1
+                        },
+                        freeze: {
+                            zoom_probability: 0.3
+                        },
+                        excluded_timestamps: [
+                            [0, 97, "Opening sequence"],
+                            [176, 206, "Scene transition"],
+                            [260, 280, "Scene transition"],
+                            [342, 357, "Scene transition"],
+                            [411, 442, "Scene transition"],
+                            [7522, 7642, "End sequence"],
+                            [7656, 7668, "Credits start"],
+                            [7773, 8138, "End credits"]
+                        ],
+                        include_timestamps: [
+                            [7674, 7773, "end"]
+                        ]
+                    },
+                    processing: false,
+                    status: '',
+                    statusClass: '',
+                    outputFile: null
+                }
+            },
+            computed: {
+                effectProbTotal() {
+                    const total = this.settings.effect_probs.slowmo + 
+                                this.settings.effect_probs.freeze + 
+                                this.settings.effect_probs.normal;
+                    return total.toFixed(2);
+                },
+                segmentDistTotal() {
+                    const total = this.settings.segment_dist.beginning + 
+                                this.settings.segment_dist.middle + 
+                                this.settings.segment_dist.end;
+                    return total.toFixed(2);
+                },
+                isValidProbabilities() {
+                    return Math.abs(this.effectProbTotal - 1) < 0.01 && 
+                           Math.abs(this.segmentDistTotal - 1) < 0.01;
+                }
+            },
+            methods: {
+                formatFileSize(bytes) {
+                    const units = ['B', 'KB', 'MB', 'GB'];
+                    let size = bytes;
+                    let unitIndex = 0;
+                    while (size >= 1024 && unitIndex < units.length - 1) {
+                        size /= 1024;
+                        unitIndex++;
+                    }
+                    return `${size.toFixed(2)} ${units[unitIndex]}`;
+                },
+                async loadFiles() {
+                    try {
+                        const response = await fetch('/files');
+                        const data = await response.json();
+                        this.files = data;
+                    } catch (error) {
+                        console.error('Error loading files:', error);
+                    }
+                },
+                async downloadFile(filename) {
+                    window.location.href = `/download/${filename}`;
+                },
+                async deleteFile(filename) {
+                    if (!confirm('Are you sure you want to delete this file?')) {
+                        return;
+                    }
+                    try {
+                        const response = await fetch(`/delete/${filename}`, {
+                            method: 'DELETE'
+                        });
+                        if (response.ok) {
+                            await this.loadFiles();
+                        } else {
+                            const data = await response.json();
+                            alert(data.error || 'Failed to delete file');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting file:', error);
+                        alert('Failed to delete file');
+                    }
+                },
+                handleVideoFile(event) {
+                    this.videoFile = event.target.files[0]
+                },
+                handleAudioFile(event) {
+                    this.audioFile = event.target.files[0]
+                },
+                addExcludedTimestamp() {
+                    this.settings.excluded_timestamps.push([0, 0, ""])
+                },
+                removeExcludedTimestamp(index) {
+                    this.settings.excluded_timestamps.splice(index, 1)
+                },
+                addIncludedTimestamp() {
+                    this.settings.include_timestamps.push([0, 0, "end"])
+                },
+                removeIncludedTimestamp(index) {
+                    this.settings.include_timestamps.splice(index, 1)
+                },
+                async submitForm() {
+                    if (!this.videoFile || !this.audioFile) {
+                        this.status = 'Please select both video and audio files'
+                        this.statusClass = 'bg-red-100 text-red-700'
+                        return
+                    }
+
+                    this.processing = true
+                    this.status = 'Processing your video...'
+                    this.statusClass = 'bg-blue-100 text-blue-700'
+
+                    const formData = new FormData()
+                    formData.append('video', this.videoFile)
+                    formData.append('audio', this.audioFile)
+                    formData.append('settings', JSON.stringify(this.settings))
+
+                    try {
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        })
+
+                        const data = await response.json()
+
+                        if (response.ok) {
+                            this.status = 'Video processed successfully!'
+                            this.statusClass = 'bg-green-100 text-green-700'
+                            this.outputFile = data.output
+                            await this.loadFiles()
+                        } else {
+                            throw new Error(data.error || 'Failed to process video')
+                        }
+                    } catch (error) {
+                        this.status = error.message
+                        this.statusClass = 'bg-red-100 text-red-700'
+                    } finally {
+                        this.processing = false
+                    }
+                }
+            },
+            mounted() {
+                this.loadFiles();
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
